@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能自然语言查询</title>
+    <script src="/static/js/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #cecece 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            animation: bgGradientShift 15s ease infinite;
+            background-size: 400% 400%;
+        }
+
+        @keyframes bgGradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            padding: 40px 30px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            transform: rotate(30deg);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 15px;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            letter-spacing: 1.5px;
+            background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+            display: inline-block;
+            animation: titleGlow 3s ease-in-out infinite alternate;
+        }
+
+        .header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 2px;
+            animation: underlinePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0% {
+                text-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            }
+            100% {
+                text-shadow: 0 4px 20px rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+            }
+        }
+
+        @keyframes underlinePulse {
+            0% {
+                width: 100px;
+            }
+            100% {
+                width: 150px;
+            }
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 20px;
+            gap: 25px;
+        }
+
+        .chat-container {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .chat-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .message-content {
+            max-width: 85%;
+            padding: 20px 26px;
+            border-radius: 24px;
+            font-size: 16px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .message-content-text {
+            white-space: pre-wrap; /* 保持空白字符和换行 */
+            word-break: break-word;
+        }
+        
+        /* Markdown 元素样式 */
+        .message-content-text h1,
+        .message-content-text h2,
+        .message-content-text h3 {
+            margin: 16px 0 10px 0;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        .message-content-text h1 {
+            font-size: 24px;
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+        
+        .message-content-text h2 {
+            font-size: 20px;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+        
+        .message-content-text h3 {
+            font-size: 18px;
+        }
+        
+        .message-content-text strong {
+            font-weight: 600;
+        }
+        
+        .message-content-text em {
+            font-style: italic;
+        }
+        
+        .message-content-text code {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 0.2em 0.4em;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 85%;
+        }
+        
+        .message-content-text a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        
+        .message-content-text a:hover {
+            text-decoration: underline;
+        }
+        
+        .message-content-text ul,
+        .message-content-text ol {
+            padding-left: 2em;
+            margin: 10px 0;
+        }
+        
+        .message-content-text li {
+            margin: 5px 0;
+        }
+        
+        .message-content-text ul li {
+            list-style-type: disc;
+        }
+        
+        .message-content-text ol li {
+            list-style-type: decimal;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 8px;
+        }
+
+        .message.ai .message-content {
+            background: #ffffff;
+            color: #333;
+            border: 1px solid #eef2f7;
+            border-bottom-left-radius: 8px;
+        }
+
+        .message-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .message.ai .message-content::before {
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+        }
+
+        .sql-code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            margin: 12px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .sql-code pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .sql-code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            margin: 12px -26px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: calc(100% + 52px);
+            max-width: calc(100% + 52px);
+            min-width: 900px;
+        }
+
+        .sql-label {
+            color: #333;
+            font-weight: 600;
+            margin: 12px 0 8px 0;
+            font-size: 14px;
+        }
+
+        .sql-code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .sql-code-label {
+            color: #9cdcfe;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sql-copy-btn {
+            background: #3d3d3d;
+            border: 1px solid #4d4d4d;
+            color: #d4d4d4;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .sql-copy-btn:hover {
+            background: #4d4d4d;
+            border-color: #5d5d5d;
+            color: #ffffff;
+        }
+
+        .sql-copy-btn:active {
+            transform: scale(0.98);
+        }
+
+        .sql-code-content {
+            margin: 0;
+            padding: 16px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .code-block {
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 12px 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .markdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            font-size: 14px;
+        }
+
+        .markdown-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .markdown-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            border: none;
+        }
+
+        .markdown-table tbody tr {
+            border-bottom: 1px solid #eef2f7;
+            transition: background-color 0.2s;
+        }
+
+        .markdown-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .markdown-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .markdown-table td {
+            padding: 12px 16px;
+            border: none;
+            color: #333;
+        }
+
+        .markdown-table tbody tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+
+        .markdown-table tbody tr:nth-child(even):hover {
+            background-color: #f0f2f5;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+        }
+
+        .results-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .results-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .results-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .echarts-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 12px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 100%;
+            min-width: 800px;
+        }
+
+        .echarts-container .chart {
+            width: 100%;
+            height: 600px;
+        }
+
+        .input-container {
+            padding: 25px;
+            background: #ffffff;
+            border-top: 1px solid #edf2f7;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.03);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 18px 22px;
+            border: 2px solid #edf2f7;
+            border-radius: 28px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+            resize: none;
+            max-height: 150px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-field:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .send-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 16px 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .query-mode-indicator {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .message-content {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+            
+            .header {
+                padding: 20px 15px;
+            }
+            
+            .header h1 {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 智能自然语言查询</h1>
+    </div>
+
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        您好！我是智能SQL助手，可以将您的自然语言问题转换为SQL查询语句。请告诉我您想查询什么数据？
+                        <br><br>
+                        例如：<br>
+                        • 查询销售额最高的前10个产品<br>
+                        • 统计每个部门的员工数量<br>
+                        • 查找最近一个月的订单信息
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        class="input-field" 
+                        id="userInput" 
+                        placeholder="输入您的问题，例如：查询最近一周的用户注册数量..."
+                        rows="1"
+                    ></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isWaitingForResponse = false;
+
+        // 简单的Markdown到HTML转换函数（基础版本，避免使用外部库）
+        function simpleMarkdownToHtml(text) {
+            if (!text) return '';
+            
+            // 转义HTML特殊字符以防止XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // 转换Markdown表格
+            html = html.replace(/(\|.*\|)\n(\|[-:|\s]+\|)\n((?:\|.*\|\n?)+)/g, function(match, headerRow, separatorRow, bodyRows) {
+                // 解析表头
+                const headers = headerRow.split('|').filter(cell => cell.trim()).map(cell => cell.trim());
+                
+                // 解析数据行
+                const rows = bodyRows.trim().split('\n').map(row => {
+                    return row.split('|').filter(cell => cell.trim()).map(cell => cell.trim());
+                });
+                
+                // 生成HTML表格
+                let tableHtml = '<table class="markdown-table"><thead><tr>';
+                headers.forEach(header => {
+                    tableHtml += `<th>${header}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+                
+                rows.forEach(row => {
+                    tableHtml += '<tr>';
+                    row.forEach(cell => {
+                        tableHtml += `<td>${cell}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table>';
+                return tableHtml;
+            });
+            
+            // 自动检测和格式化SQL代码（以"首次生成的SQL:"开头）
+            html = html.replace(/首次生成的SQL:\s*([\s\S]*?)(?=\n\n|\n✅|\n🎨|\n###|\n\*\*|$)/g, function(match, sqlCode) {
+                const codeId = 'sql-code-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                const trimmedSql = sqlCode.trim();
+                return `
+                    <div class="sql-label">首次生成的SQL:</div>
+                    <div class="sql-code-block">
+                        <div class="sql-code-header">
+                            <span class="sql-code-label">SQL</span>
+                            <button class="sql-copy-btn" onclick="copySqlCode('${codeId}')">复制</button>
+                        </div>
+                        <pre class="sql-code-content" id="${codeId}">${trimmedSql}</pre>
+                    </div>
+                `;
+            });
+            
+            // 转换SQL代码块 ```sql ... ```
+            html = html.replace(/```sql\s*([\s\S]*?)```/g, function(match, code) {
+                const codeId = 'sql-code-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                return `
+                    <div class="sql-code-block">
+                        <div class="sql-code-header">
+                            <span class="sql-code-label">SQL</span>
+                            <button class="sql-copy-btn" onclick="copySqlCode('${codeId}')">复制</button>
+                        </div>
+                        <pre class="sql-code-content" id="${codeId}">${code.trim()}</pre>
+                    </div>
+                `;
+            });
+            
+            // 转换普通代码块 ``` ... ```
+            html = html.replace(/```\s*([\s\S]*?)```/g, '<pre class="code-block">$1</pre>');
+            
+            // 转换粗体 **text**
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // 转换斜体 *text*
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // 转换代码 `code`
+            html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+            
+            // 转换链接 [text](url)
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+            
+            // 转换标题 # H1, ## H2, ### H3
+            html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            
+            // 转换无序列表 * item
+            html = html.replace(/^\* (.*$)/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)+/gs, '<ul>$&</ul>');
+            
+            // 转换有序列表 1. item
+            html = html.replace(/^\d+\. (.*$)/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)+/gs, '<ol>$&</ol>');
+            
+            // 处理换行
+            html = html.replace(/\n/g, '<br>');
+            
+            return html;
+        }
+
+        function copySqlCode(codeId) {
+            const codeElement = document.getElementById(codeId);
+            if (codeElement) {
+                const code = codeElement.textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    const button = codeElement.previousElementSibling.querySelector('.sql-copy-btn');
+                    if (button) {
+                        const originalText = button.textContent;
+                        button.textContent = '已复制!';
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                        }, 2000);
+                    }
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            }
+        }
+
+        function addMessage(content, isUser = false, sqlCode = null, results = null, echartsData = null) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+            
+            // 使用简单的Markdown到HTML转换
+            const contentElement = document.createElement('div');
+            contentElement.className = 'message-content-text';
+            contentElement.innerHTML = simpleMarkdownToHtml(content);
+            
+            const messageContentDiv = document.createElement('div');
+            messageContentDiv.className = 'message-content';
+            if (!isUser) {
+                messageContentDiv.id = 'ai-content-' + Date.now();
+            }
+            
+            messageContentDiv.appendChild(contentElement);
+            
+            // 添加SQL代码块（如果存在）
+            if (sqlCode) {
+                const sqlCodeDiv = document.createElement('div');
+                sqlCodeDiv.className = 'sql-code';
+                
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-btn';
+                copyButton.textContent = '复制';
+                copyButton.onclick = function() { copyToClipboard(this); };
+                
+                const codePre = document.createElement('pre');
+                codePre.textContent = sqlCode;
+                
+                sqlCodeDiv.appendChild(copyButton);
+                sqlCodeDiv.appendChild(codePre);
+                messageContentDiv.appendChild(sqlCodeDiv);
+            }
+            
+            // 添加结果表格（如果存在）
+            if (results) {
+                const resultsDiv = document.createElement('div');
+                resultsDiv.className = 'results-table';
+                resultsDiv.innerHTML = results;
+                messageContentDiv.appendChild(resultsDiv);
+            }
+            
+            // 添加ECharts图表（如果存在）
+            if (echartsData) {
+                try {
+                    const echartsContainer = document.createElement('div');
+                    echartsContainer.className = 'echarts-container';
+                    
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'chart';
+                    chartDiv.id = 'chart-' + Date.now();
+                    
+                    echartsContainer.appendChild(chartDiv);
+                    messageContentDiv.appendChild(echartsContainer);
+                    
+                    // 渲染图表
+                    setTimeout(() => {
+                        const chart = echarts.init(chartDiv);
+                        chart.setOption(echartsData);
+                        
+                        // 响应式调整
+                        window.addEventListener('resize', () => {
+                            chart.resize();
+                        });
+                    }, 100);
+                } catch (error) {
+                    console.error('ECharts渲染失败:', error);
+                }
+            }
+            
+            const avatarDiv = document.createElement('div');
+             avatarDiv.className = 'message-avatar';
+             avatarDiv.textContent = isUser ? '👤' : '🤖';
+             
+             messageDiv.appendChild(avatarDiv);
+             messageDiv.appendChild(messageContentDiv);
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // 返回消息元素，便于后续更新
+            return messageDiv;
+        }
+
+        function pythonDictToJson(pythonDictStr) {
+            if (!pythonDictStr) return null;
+            try {
+                // 尝试直接解析（如果已经是标准JSON）
+                return JSON.parse(pythonDictStr);
+            } catch (e) {
+                try {
+                    // 将Python字典字符串转换为JSON字符串
+                    let jsonStr = pythonDictStr
+                        .replace(/'/g, '"')
+                        .replace(/True/g, 'true')
+                        .replace(/False/g, 'false')
+                        .replace(/None/g, 'null');
+                    return JSON.parse(jsonStr);
+                } catch (e2) {
+                    console.warn('无法解析Python字典:', pythonDictStr, e2);
+                    return null;
+                }
+            }
+        }
+
+        function addEchartsToMessage(messageDiv, echartsData) {
+            try {
+                const messageContentDiv = messageDiv.querySelector('.message-content');
+                if (!messageContentDiv) return;
+                
+                // 检查是否已经添加了图表
+                if (messageContentDiv.querySelector('.echarts-container')) return;
+                
+                const echartsContainer = document.createElement('div');
+                echartsContainer.className = 'echarts-container';
+                
+                const chartDiv = document.createElement('div');
+                chartDiv.className = 'chart';
+                chartDiv.id = 'chart-' + Date.now();
+                
+                echartsContainer.appendChild(chartDiv);
+                messageContentDiv.appendChild(echartsContainer);
+                
+                // 渲染图表
+                setTimeout(() => {
+                    const chart = echarts.init(chartDiv);
+                    chart.setOption(echartsData);
+                    
+                    // 响应式调整
+                    window.addEventListener('resize', () => {
+                        chart.resize();
+                    });
+                }, 100);
+            } catch (error) {
+                console.error('添加ECharts图表失败:', error);
+            }
+        }
+
+        function addTypingIndicator() {
+            const messagesContainer = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai';
+            typingDiv.id = 'typingIndicator';
+            
+            typingDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            
+            if (!message || isWaitingForResponse) return;
+            
+            addMessage(message, true);
+            input.value = '';
+            input.style.height = 'auto';
+            
+            isWaitingForResponse = true;
+            document.getElementById('sendBtn').disabled = true;
+            
+            addTypingIndicator();
+            
+            try {
+                // 所有用户对话都直接调用/query接口
+                const requestBody = {
+                    question: message
+                };
+                
+                // 调用实际的查询API
+                const response = await fetch('/default/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // 读取流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulatedContent = '';
+                let echartsData = null;
+                let hasEcharData = false;
+                let currentMessageDiv = null;
+                
+                removeTypingIndicator();
+                
+                // 逐块读取流式数据
+                while (true) {
+                    // 在等待数据时显示闪烁提示
+                    addTypingIndicator();
+                    
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        removeTypingIndicator();
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n').filter(line => line.trim());
+                    
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            
+                            if (data.content) {
+                                let content = data.content;
+                                
+                                // 如果content是字符串，则trim；如果是对象，直接使用
+                                if (typeof content === 'string') {
+                                    content = content.trim();
+                                    console.log('接收到的content (字符串):', content);
+                                } else {
+                                    console.log('接收到的content (对象):', content);
+                                }
+                                
+                                // 检查content是否是对象且有has_echar_data字段
+                                if (typeof content === 'object' && content.has_echar_data !== undefined) {
+                                    hasEcharData = content.has_echar_data;
+                                    console.log('更新has_echar_data:', hasEcharData);
+                                    continue;
+                                }
+                                
+                                // 检查content是否是JSON字符串（可能是Python字典格式）
+                                if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
+                                    try {
+                                        const parsedContent = pythonDictToJson(content);
+                                        console.log('解析后的content:', parsedContent);
+                                        
+                                        // 检查是否有has_echar_data字段
+                                        if (parsedContent.has_echar_data !== undefined) {
+                                            hasEcharData = parsedContent.has_echar_data;
+                                            console.log('更新has_echar_data:', hasEcharData);
+                                            continue;
+                                        }
+                                        
+                                        // 检查是否是ECharts数据
+                                        if (parsedContent && (parsedContent.series || parsedContent.xAxis || parsedContent.yAxis || parsedContent.title)) {
+                                            console.log('确认为ECharts数据，has_echar_data:', hasEcharData);
+                                            
+                                            // 只有当has_echar_data为true时才渲染图表
+                                            if (hasEcharData) {
+                                                echartsData = parsedContent;
+                                                if (currentMessageDiv) {
+                                                    addEchartsToMessage(currentMessageDiv, echartsData);
+                                                }
+                                            } else {
+                                                console.log('has_echar_data为false，不显示图表');
+                                                currentMessageDiv = addMessage(typeof content === 'string' ? content : JSON.stringify(content), false);
+                                            }
+                                        } else {
+                                            console.log('不是ECharts数据，作为普通文本处理');
+                                            currentMessageDiv = addMessage(typeof content === 'string' ? content : JSON.stringify(content), false);
+                                        }
+                                    } catch (e) {
+                                        console.error('解析JSON内容失败:', e);
+                                        currentMessageDiv = addMessage(typeof content === 'string' ? content : JSON.stringify(content), false);
+                                    }
+                                } else if (typeof content === 'object' && (content.series || content.xAxis || content.yAxis || content.title)) {
+                                    // content已经是对象，且是ECharts数据
+                                    console.log('content是对象，确认为ECharts数据，has_echar_data:', hasEcharData);
+                                    
+                                    // 只有当has_echar_data为true时才渲染图表
+                                    if (hasEcharData) {
+                                        echartsData = content;
+                                        if (currentMessageDiv) {
+                                            addEchartsToMessage(currentMessageDiv, echartsData);
+                                        }
+                                    } else {
+                                        console.log('has_echar_data为false，不显示图表');
+                                        currentMessageDiv = addMessage(JSON.stringify(content), false);
+                                    }
+                                } else {
+                                    console.log('普通文本内容');
+                                    currentMessageDiv = addMessage(typeof content === 'string' ? content : JSON.stringify(content), false);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('解析JSON行失败:', line, e);
+                        }
+                    }
+                    
+                    // 处理完当前数据块后，移除闪烁提示
+                    removeTypingIndicator();
+                }
+                
+            } catch (error) {
+                removeTypingIndicator();
+                console.error('API调用失败:', error);
+                addMessage(`抱歉，查询失败：${error.message}`, false);
+            }
+            
+            isWaitingForResponse = false;
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        // 调用实际的查询API
+        // fetchQueryAPI函数已被移除，所有查询直接在sendMessage中处理
+
+        // 渲染查询响应
+        function renderQueryResponse(response) {
+            if (!response || !response.content) {
+                addMessage("抱歉，没有获取到有效的响应数据。", false);
+                return;
+            }
+            
+            const content = response.content.trim();
+            
+            if (content === "") {
+                addMessage("查询返回了空内容。", false);
+                return;
+            }
+            
+            // 直接显示响应内容
+            addMessage(content, false);
+        }
+
+        function copyToClipboard(button) {
+            const codeBlock = button.parentElement;
+            const code = codeBlock.textContent.replace('复制', '').trim();
+            
+            navigator.clipboard.writeText(code).then(() => {
+                button.textContent = '已复制!';
+                setTimeout(() => {
+                    button.textContent = '复制';
+                }, 2000);
+            });
+        }
+
+        // 自动调整输入框高度
+        document.getElementById('userInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // 回车发送消息，Shift+回车换行
+        document.getElementById('userInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 页面加载时聚焦输入框
+        window.addEventListener('load', function() {
+            document.getElementById('userInput').focus();
+        });
+    </script>
+</body>
+</html>
